@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>HerdrNet</AssemblyName>
+    <RootNamespace>HerdrNet</RootNamespace>
+    <PackageId>HerdrNet</PackageId>
+    <!-- Tracks the herdr-core API version the client is written against (api/herdr-core-<version>.openrpc.json);
+         a 4th component is a client-only revision against that same API. -->
+    <Version>0.1.18</Version>
+    <Description>Hand-maintained, strongly typed, async .NET client for the herdr-core terminal runtime: JSON-RPC calls, framed terminal streams with flow control, and events. UI-free.</Description>
+    <PackageTags>herdr;herdr-core;terminal;json-rpc;agents</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- LibraryImport (getuid on Unix) generates unsafe marshalling stubs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HerdrNet.Test" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
