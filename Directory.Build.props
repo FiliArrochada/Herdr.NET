@@ -1,0 +1,27 @@
+<Project>
+
+  <!-- SHARED BLOCK - keep it exactly as it is, byte for byte. Put this repo's own settings below the separator, in this same file. -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <!-- Binding redirects for projects that carry an app.config or a web.config.
+       GenerateBindingRedirectsOutputType extends the generation to library and test outputs, which are skipped otherwise. -->
+  <PropertyGroup Condition="Exists('$(MSBuildProjectDirectory)/app.config') Or Exists('$(MSBuildProjectDirectory)/web.config')">
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <!-- ================================ end of shared block ================================ -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Company>FiliArrochada</Company>
+    <Authors>FiliArrochada</Authors>
+    <Copyright>Copyright (c) 2026 FiliArrochada</Copyright>
+  </PropertyGroup>
+
+</Project>
