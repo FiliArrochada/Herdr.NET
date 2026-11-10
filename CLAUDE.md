@@ -41,5 +41,8 @@ One package, `net10.0`, UI-free, MIT. Layout:
   `HC_SESSION` (the probe's default is `herdrnet-probe`).
 - **Never log terminal bytes or call parameters**: terminal output and documents may hold secrets.
   Log methods, ids, sizes and timings only.
+- **Releases go out by tag.** Pushing `v<Version>` runs `release-nuget.yml`: it fails unless the
+  tag equals `<Version>` in `HerdrNet.csproj`, then tests, packs, pushes to nuget.org (Trusted
+  Publishing) and creates the GitHub release. Bump `<Version>` in a commit before tagging it.
 - Run tests through the workspace's `dt.sh`. A hung test usually means a `ReadAsync` waiting on
   data that never comes: give every await in a test a `WaitAsync(Timeout)`.

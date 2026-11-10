@@ -1,0 +1,95 @@
+name: Release to NuGet
+run-name: Release ${{ github.ref_name }} to NuGet
+
+# Publishes the HerdrNet package to nuget.org when a v<version> tag is pushed:
+#
+#   git tag v0.1.20 && git push origin v0.1.20
+#
+# The tag must match <Version> in src/HerdrNet/HerdrNet.csproj (bump it there first, commit,
+# then tag that commit); the "Check version" step fails the run otherwise.
+#
+# Publishing uses nuget.org Trusted Publishing (OIDC): no long-lived API key.
+# nuget.org side: create a Trusted Publishing policy under your profile with
+#   Repository Owner: FiliArrochada
+#   Repository: Herdr.NET
+#   Workflow File: release-nuget.yml
+# Leave Environment blank unless you add `environment:` to the job below.
+# GitHub side: the only secret needed is NUGET_USER = your nuget.org profile name (the account
+# username, not an email address). The job requests a short-lived key at run time.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # creates the GitHub release for the tag
+  id-token: write   # Trusted Publishing: lets the job request a GitHub OIDC token
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version
+        shell: bash   # the default shell on windows-latest is pwsh
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/HerdrNet/HerdrNet.csproj)
+          tag="${GITHUB_REF_NAME}"
+          echo "Releasing **HerdrNet $version** from tag \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::Tag '$tag' does not match csproj <Version> '$version' (expected 'v$version')."
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore HerdrNet.sln
+
+      - name: Build
+        run: dotnet build HerdrNet.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test HerdrNet.sln -c Release --no-build
+
+      - name: Pack
+        run: dotnet pack src/HerdrNet/HerdrNet.csproj -c Release --no-build -o artifacts
+
+      # Exchange the GitHub OIDC token for a short-lived nuget.org API key.
+      # Done right before push: the key is valid for only 1 hour.
+      - name: NuGet login (OIDC → temporary API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet
+        # Backslash on purpose: on Windows runners, dotnet nuget push does not expand
+        # wildcards in forward-slash paths. The .snupkg beside each .nupkg is pushed with it.
+        run: >
+          dotnet nuget push "artifacts\*.nupkg"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Release $tag already exists - nothing to do."
+          else
+            gh release create "$tag" artifacts/*.nupkg --title "$tag" --generate-notes --verify-tag
+          fi
