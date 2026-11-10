@@ -237,8 +237,33 @@ public class SupervisorTests
         Assert.Equal(4, away.Opens);                      // one more try, then waiting again
     }
 
-    /// <summary>A carrier whose far end never answers.</summary>
-    sealed class AwayTransport : IHerdrTransport
+    [Fact]
+    public async Task A_carrier_throwing_its_own_librarys_exception_is_a_failed_attempt_not_the_end()
+    {
+        // An SSH library's exception, say: not one of HerdrNet's. It used to end the loop, leaving the
+        // state "connecting" with nothing ever tried again.
+        var odd = new AwayTransport(() => new NotSupportedException("Invalid private key file."));
+        await using var supervisor = new ConnectionSupervisor(new HerdrOptions
+        {
+            Carrier = odd, MirrorTerminals = false, FirstAttempts = 2, ReconnectDelays = [TimeSpan.FromMilliseconds(5)],
+        });
+        supervisor.Start();
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, odd.Opens);                                        // retried, then waits as usual
+        var state = supervisor.StateDetails;
+        Assert.Equal(HerdrConnectionState.Connecting, state.State);
+        var error = Assert.IsType<HerdrConnectionException>(state.Error);  // said as a connection error
+        Assert.Equal("Invalid private key file.", error.Message);
+        Assert.IsType<NotSupportedException>(error.InnerException);
+
+        supervisor.RetryNow(startCore: true);                              // and the person can still retry
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+        Assert.Equal(3, odd.Opens);
+    }
+
+    /// <summary>A carrier whose far end never answers (or that fails with <paramref name="failure"/>).</summary>
+    sealed class AwayTransport(Func<Exception>? failure = null) : IHerdrTransport
     {
         public int Opens;
         public string Description => "away";
@@ -246,7 +271,7 @@ public class SupervisorTests
         public ValueTask<Stream> OpenAsync(CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref Opens);
-            throw new IOException("No route to host.");
+            throw failure?.Invoke() ?? new IOException("No route to host.");
         }
     }
 

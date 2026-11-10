@@ -284,6 +284,15 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
                     : e is HerdrCoreUnavailableException && _options.Transport == HerdrTransportPreference.DirectThenHcConnect ? HerdrConnectionState.CoreStopped
                     : HerdrConnectionState.Reconnecting;
             }
+            catch (Exception e)
+            {
+                // Anything else from an attempt (a caller's Carrier throwing its own library's exception,
+                // a cancellation that was not ours): a failed attempt like the others. Letting it out
+                // would end this loop and leave the state as it was, with nothing ever tried again.
+                _logger.LogWarning("A connection attempt failed with {Kind}: {Message}", e.GetType().Name, e.Message);
+                error = new HerdrConnectionException(e.Message, e);
+                waitState = everConnected ? HerdrConnectionState.Reconnecting : HerdrConnectionState.Connecting;
+            }
 
             lastError = error;
             if (everConnected && OnlyReachedByStarting)
@@ -474,7 +483,8 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
         }
         catch (Exception e)
         {
-            _logger.LogDebug(e, "The supervisor loop ended with an error");
+            // Attempts no longer end the loop; this is a defect (a state handler, the wait), so say it loudly.
+            _logger.LogError(e, "The supervisor loop ended with an error");
         }
 
         lock (_gate)
