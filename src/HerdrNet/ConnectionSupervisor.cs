@@ -40,12 +40,28 @@ public sealed class HerdrOptions
     /// </summary>
     public IReadOnlyList<string>? Command { get; set; }
 
+    /// <summary>
+    /// A transport the caller opens itself, used instead of this machine's core: an SSH channel to
+    /// <c>hc connect</c> on another machine, from an app that cannot start <c>ssh</c>. It opens a fresh
+    /// stream on every attempt. Treated like <see cref="Command"/>: it may start a core, so after a loss
+    /// the supervisor waits in <see cref="HerdrConnectionState.Disconnected"/>. Wins over <see cref="Command"/>.
+    /// </summary>
+    public IHerdrTransport? Carrier { get; set; }
+
     /// <summary>Handshake settings, including the methods the caller needs.</summary>
     public HerdrConnectionOptions Connection { get; set; } = new();
 
     /// <summary>Waits between failed attempts; the last repeats. Default 0.5, 1, 2, 5 s.</summary>
     public IReadOnlyList<TimeSpan> ReconnectDelays { get; set; } =
         [TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5)];
+
+    /// <summary>
+    /// How many attempts before the first connection, after which the supervisor stops trying and waits
+    /// for <see cref="ConnectionSupervisor.RetryNow"/> (null: keep trying, with <see cref="ReconnectDelays"/>).
+    /// For a place that may well be away (another computer over <see cref="Command"/>): each attempt runs
+    /// the command and may start a core there. The state stays the last failure's, with no next attempt.
+    /// </summary>
+    public int? FirstAttempts { get; set; }
 
     /// <summary>Start a <see cref="TerminalMirror"/> on every connection (default true).</summary>
     public bool MirrorTerminals { get; set; } = true;
@@ -172,6 +188,35 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Leaves the live connection and connects again now, through the transport as it is now: for when
+    /// where to connect changed (a phone switching to another paired computer sets a new
+    /// <see cref="HerdrOptions.Carrier"/>). Leaving sends CLOSE on the streams; the core is untouched.
+    /// <paramref name="startCore"/> is as for <see cref="RetryNow"/>, and a connection only a carrier or a
+    /// command makes needs it to come back (it waits for the person after a loss). With no live
+    /// connection this is <see cref="RetryNow"/>.
+    /// </summary>
+    public void Reconnect(bool startCore = false)
+    {
+        HerdrConnection? current;
+        lock (_gate)
+            current = Current;
+        if (current is null)
+        {
+            RetryNow(startCore);
+            return;
+        }
+
+        if (startCore)
+            Volatile.Write(ref _startRequested, 1);
+        _logger.LogInformation("Leaving the connection to connect again");
+        // The hold sees the connection end and the loop goes round: straight away when the start was
+        // requested; otherwise after its wait, which the wake cuts short.
+        _ = current.DisposeAsync().AsTask();
+        if (!OnlyReachedByStarting)
+            RetryNow();
+    }
+
     /// <summary>The live connection, waiting for one when there is none.</summary>
     public Task<HerdrConnection> WaitForConnectionAsync(CancellationToken cancellationToken = default)
     {
@@ -247,6 +292,17 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
                 continue; // straight to Disconnected: no attempt without the person
             }
 
+            // Never reached, and the attempts allowed before that are spent: wait for the person.
+            if (!everConnected && _options.FirstAttempts is { } allowed && failures + 1 >= allowed)
+            {
+                failures++;
+                steady = null;
+                Set(waitState, error, failures, null);
+                if (!await WaitAsync(Timeout.InfiniteTimeSpan, stop).ConfigureAwait(false))
+                    break;
+                continue;
+            }
+
             steady = waitState is HerdrConnectionState.CoreStopped or HerdrConnectionState.NotInstalled ? waitState : null;
             var delay = Delay(waitState == HerdrConnectionState.NotInstalled ? int.MaxValue : failures);
             failures++;
@@ -282,7 +338,7 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
     }
 
     /// <summary>Every way in may start a stopped core: <c>hc connect</c> only, or a command.</summary>
-    bool OnlyReachedByStarting => _options.Command is not null || _options.Transport == HerdrTransportPreference.HcConnect;
+    bool OnlyReachedByStarting => _options.Carrier is not null || _options.Command is not null || _options.Transport == HerdrTransportPreference.HcConnect;
 
     async Task<HerdrConnection> OpenAsync(bool mayStart, CancellationToken stop)
     {
@@ -308,6 +364,7 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
 
     IHerdrTransport? DefaultTransport(HerdrTransportPreference kind) => kind switch
     {
+        _ when _options.Carrier is { } carrier => carrier,
         _ when _options.Command is { Count: > 0 } command =>
             new HcConnectTransport(command[0], command.Skip(1).ToArray(), session: null, _loggers.CreateLogger<HcConnectTransport>()),
         HerdrTransportPreference.Direct => new EndpointTransport(HerdrEndpoint.Resolve(_options.Session)),

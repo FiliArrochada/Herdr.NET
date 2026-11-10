@@ -82,6 +82,14 @@ builder.Services.AddHerdr(o => o.Command = ["ssh", "box", "hc", "connect", "--se
 supervisor.RetryNow(startCore: true);   // runs the command once more
 ```
 
+Where no program can be started (a phone), open the stream yourself, such as an SSH channel to
+`hc connect`, and pass it as a `Carrier`: an `IHerdrTransport` that opens a fresh stream on each
+attempt. It follows the same rules as `Command`, which it replaces.
+
+```csharp
+builder.Services.AddHerdr(o => o.Carrier = new MySshChannelTransport(...));
+```
+
 `hc connect` starts a stopped core, and nothing tells a stopped core from a dropped line without
 running it, so a connection only `hc connect` or a command can make (`Command`, or
 `Transport = HcConnect`) is made by itself only the first time: after a loss the supervisor waits in

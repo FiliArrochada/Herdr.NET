@@ -163,6 +163,109 @@ public class SupervisorTests
         await core.DisposeAsync();
     }
 
+    [Fact]
+    public async Task A_carrier_is_the_only_way_in_and_waits_for_the_person_after_a_loss()
+    {
+        var first = new FakeCore();
+        var next = new FakeCore();
+        var carrier = new QueuedTransport(first.Transport, next.Transport);
+        await using var supervisor = new ConnectionSupervisor(new HerdrOptions
+        {
+            Carrier = carrier, MirrorTerminals = false, ReconnectDelays = [TimeSpan.FromMilliseconds(10)],
+            // Never used: a carrier wins over a command, and this machine's core is never tried.
+            Command = ["ssh", "nowhere", "hc", "connect"],
+        });
+        var states = Channel.CreateUnbounded<HerdrConnectionState>();
+        supervisor.StateChanged += s => states.Writer.TryWrite(s.State);
+        supervisor.Start();
+        await AnswerHelloAsync(first);
+        await WaitAsync(states, HerdrConnectionState.Connected);
+
+        await first.DisconnectAsync();
+        await WaitAsync(states, HerdrConnectionState.Disconnected);
+        supervisor.RetryNow(startCore: true);
+        await AnswerHelloAsync(next);
+        await WaitAsync(states, HerdrConnectionState.Connected);
+
+        Assert.Equal(2, carrier.Opens);
+        await first.DisposeAsync();
+        await next.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Reconnect_leaves_a_live_connection_and_opens_the_carrier_again()
+    {
+        var first = new FakeCore();
+        var next = new FakeCore();
+        var carrier = new QueuedTransport(first.Transport, next.Transport);
+        await using var supervisor = new ConnectionSupervisor(new HerdrOptions
+        {
+            Carrier = carrier, MirrorTerminals = false, ReconnectDelays = [TimeSpan.FromMilliseconds(10)],
+        });
+        var states = Channel.CreateUnbounded<HerdrConnectionState>();
+        supervisor.StateChanged += s => states.Writer.TryWrite(s.State);
+        supervisor.Start();
+        await AnswerHelloAsync(first);
+        await WaitAsync(states, HerdrConnectionState.Connected);
+
+        supervisor.Reconnect(startCore: true); // e.g. another computer was chosen
+        await AnswerHelloAsync(next);
+        await WaitAsync(states, HerdrConnectionState.Connected);
+
+        Assert.Equal(2, carrier.Opens);
+        Assert.Same(supervisor.Current, await supervisor.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        await first.DisposeAsync();
+        await next.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task With_FirstAttempts_a_place_never_reached_stops_trying_until_asked()
+    {
+        var away = new AwayTransport();
+        await using var supervisor = new ConnectionSupervisor(new HerdrOptions
+        {
+            Carrier = away, MirrorTerminals = false, FirstAttempts = 3, ReconnectDelays = [TimeSpan.FromMilliseconds(5)],
+        });
+        supervisor.Start();
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, away.Opens);                      // then it waits, however long
+        Assert.Null(supervisor.StateDetails.NextAttemptIn);
+
+        supervisor.RetryNow(startCore: true);              // the person asked
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+        Assert.Equal(4, away.Opens);                      // one more try, then waiting again
+    }
+
+    /// <summary>A carrier whose far end never answers.</summary>
+    sealed class AwayTransport : IHerdrTransport
+    {
+        public int Opens;
+        public string Description => "away";
+
+        public ValueTask<Stream> OpenAsync(CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref Opens);
+            throw new IOException("No route to host.");
+        }
+    }
+
+    /// <summary>A carrier that opens the next queued transport's stream on each attempt.</summary>
+    sealed class QueuedTransport(params IHerdrTransport[] transports) : IHerdrTransport
+    {
+        public int Opens;
+        public string Description => "carrier";
+        public ValueTask<Stream> OpenAsync(CancellationToken cancellationToken = default) =>
+            transports[Interlocked.Increment(ref Opens) - 1].OpenAsync(cancellationToken);
+    }
+
+    static async Task WaitAsync(Channel<HerdrConnectionState> states, HerdrConnectionState wanted)
+    {
+        while (await states.Reader.ReadAsync().AsTask().WaitAsync(Timeout) != wanted)
+        {
+        }
+    }
+
     [Theory]
     [InlineData(true)]  // a Command (ssh box hc connect)
     [InlineData(false)] // Transport = HcConnect
