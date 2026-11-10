@@ -11,7 +11,7 @@ namespace HerdrNet.Test;
 /// </summary>
 public class SchemaContractTests
 {
-    const string SchemaFile = "herdr-core-0.1.18.openrpc.json";
+    const string SchemaFile = "herdr-core-0.1.20.openrpc.json";
 
     static readonly Lazy<JsonElement> Schema = new(() =>
         JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "api", SchemaFile))).RootElement.Clone());
@@ -22,6 +22,7 @@ public class SchemaContractTests
     {
         { "HelloResult", nameof(Json.HelloResult) },
         { "CoreInfo", "CoreInfo" },
+        { "LoginSession", "LoginSession" },
         { "Terminal", nameof(Json.Terminal) },
         { "Status", "TerminalStatus" },
         { "Foreground", "ForegroundProcess" },

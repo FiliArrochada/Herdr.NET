@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace HerdrNet.Model;
 
-// Hand-maintained from api/herdr-core-0.1.18.openrpc.json, as Models.cs; checked by the contract tests.
+// Hand-maintained from the newest document in api/, as Models.cs; checked by the contract tests.
 
 /// <summary><c>terminal.rm</c> reply.</summary>
 public sealed record RemoveResult

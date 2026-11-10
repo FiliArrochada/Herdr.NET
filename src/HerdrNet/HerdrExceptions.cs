@@ -59,6 +59,7 @@ public static class HerdrErrorKinds
     public const string MachineUnknown = "machine_unknown";
     public const string Finished = "finished";
     public const string Blocked = "blocked";
+    public const string Cancelled = "cancelled";
     public const string Internal = "internal";
 #pragma warning restore CS1591
 }

@@ -14,3 +14,5 @@ One file per release, never overwritten: add the new release's document beside t
 | File | Source commit | Copied |
 |---|---|---|
 | `herdr-core-0.1.18.openrpc.json` | `cd12ddd` (after `v0.1.18`) | 2026-11-07 |
+| `herdr-core-0.1.19.openrpc.json` | `06793ed` (`v0.1.19`; methods and schemas as 0.1.18) | 2026-11-09 |
+| `herdr-core-0.1.20.openrpc.json` | `de97ea5` (`v0.1.20`) | 2026-11-10 |

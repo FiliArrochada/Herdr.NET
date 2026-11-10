@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace HerdrNet.Model;
 
-// Hand-maintained from api/herdr-core-0.1.18.openrpc.json. Property names map to the wire through
+// Hand-maintained from the newest document in api/. Property names map to the wire through
 // the snake_case policy in HerdrJsonContext; the contract tests check them against the schema.
 // Open sets of words (state, reason, status) stay strings: the core may add values.
 
@@ -12,7 +12,7 @@ public sealed record HelloResult
 {
     /// <summary>Protocol generation the core speaks.</summary>
     public uint Generation { get; init; }
-    /// <summary>The core's version (<c>0.1.18</c>).</summary>
+    /// <summary>The core's version.</summary>
     public string Version { get; init; } = "";
     /// <summary>Which core this is.</summary>
     public CoreInfo Core { get; init; } = new();
@@ -22,6 +22,19 @@ public sealed record HelloResult
     public IReadOnlyList<string> Methods { get; init; } = [];
     /// <summary>Optional protocol features (<c>automatic_input</c>, <c>resize_notifications</c>, ...).</summary>
     public IReadOnlyList<string> Features { get; init; } = [];
+    /// <summary>The OS login the core inherited; null when the core does not say.</summary>
+    public LoginSession? LoginSession { get; init; }
+}
+
+/// <summary>The OS login a process inherited (rather than text restored from its environment).</summary>
+public sealed record LoginSession
+{
+    /// <summary>The login session's id.</summary>
+    public uint Id { get; init; }
+    /// <summary>The user's numeric id.</summary>
+    public uint User { get; init; }
+    /// <summary>Whether it is a graphical login; null when unknown.</summary>
+    public bool? Gui { get; init; }
 }
 
 /// <summary>A core's identity.</summary>
@@ -263,7 +276,7 @@ public sealed record TerminalRunOptions
     public string? Name { get; init; }
     /// <summary>Working directory (default: the core's).</summary>
     public string? Cwd { get; init; }
-    /// <summary>Set on top of the core's environment; pass the viewer's terminal identity (TERM, TERM_PROGRAM, COLORTERM) here.</summary>
+    /// <summary>Overrides the core's environment and terminal identity; leave TERM, TERM_PROGRAM and COLORTERM out to get the core's defaults.</summary>
     public IReadOnlyDictionary<string, string>? Env { get; init; }
     /// <summary>Labels to start with.</summary>
     public IReadOnlyDictionary<string, string>? Labels { get; init; }

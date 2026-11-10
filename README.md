@@ -18,11 +18,11 @@ Not affiliated with the herdr project. "herdr" names the software this library t
 
 | | |
 |---|---|
-| API version | herdr-core **0.1.18**, protocol generation 1 ([`api/herdr-core-0.1.18.openrpc.json`](api/herdr-core-0.1.18.openrpc.json)) |
-| Package version | `0.1.18` = the API version; a 4th component is a client-only revision against the same API |
+| API version | herdr-core **0.1.20**, protocol generation 1 ([`api/herdr-core-0.1.20.openrpc.json`](api/herdr-core-0.1.20.openrpc.json)) |
+| Package version | `0.1.20` = the API version; a 4th component is a client-only revision against the same API |
 | Framework | `net10.0` |
 | Dependencies | `Microsoft.Extensions.Logging.Abstractions`, `.DependencyInjection.Abstractions`, `.Hosting.Abstractions`, `.Options` |
-| Status | preview: unit-tested against a scripted core; probe passes against hc 0.1.18 on Windows, both transports |
+| Status | preview: unit-tested against a scripted core; probe passes against hc 0.1.20 on Windows and Debian 13 (both transports) |
 
 The models are written by hand and kept in sync with the vendored OpenRPC document; contract tests
 fail when a wire name the client uses is not in the schema, or a field the schema requires is not
@@ -144,8 +144,8 @@ connection loss, the mirror's event table, and the supervisor's reconnect and fa
 - **Endpoints.** Names follow herdr-core's source
   (`\\.\pipe\herdr-core-<user>-<session>.sock` on Windows; `$XDG_RUNTIME_DIR/herdr-core/<session>.sock`,
   then `/run/user/<uid>/…`, then the session's state folder on Unix). The Windows name is confirmed against
-  hc 0.1.18, and so is the first Unix one (`$XDG_RUNTIME_DIR/herdr-core/<session>.sock`: the probe
-  passes end to end against hc 0.1.18 on Debian 13); the fallbacks and macOS are not yet. The
+  a real core, and so is the first Unix one (`$XDG_RUNTIME_DIR/herdr-core/<session>.sock`: the probe
+  passes end to end on Debian 13); the fallbacks and macOS are not yet. The
   Unix-socket transport itself (connect, handshake, framed calls, "unavailable" when nothing
   listens) is also tested over a real AF_UNIX socket, which Windows 10 and later have
   (`UnixSocketTransportTests`).

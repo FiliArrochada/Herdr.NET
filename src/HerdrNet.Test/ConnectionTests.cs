@@ -1,5 +1,6 @@
 using System.Text;
 using HerdrNet.Framing;
+using HerdrNet.Model;
 
 namespace HerdrNet.Test;
 
@@ -25,6 +26,21 @@ public class ConnectionTests
         Assert.Equal("0.1.18", connection.Hello.Version);
         Assert.Equal("c0ffee", connection.Hello.Core.Id);
         Assert.True(connection.Supports("automatic_input"));
+        Assert.Null(connection.Hello.LoginSession);
+    }
+
+    [Fact]
+    public async Task Hello_keeps_the_login_session_the_core_reports()
+    {
+        await using var core = new FakeCore();
+        var connecting = HerdrConnection.ConnectAsync(core.Transport);
+        var hello = await core.ReadLineAsync();
+        var reply = FakeCore.DefaultHello.Replace("\"framed\":true", "\"framed\":true,\"login_session\":{\"id\":3,\"user\":501,\"gui\":true}");
+
+        await core.SendLineAsync($$"""{"jsonrpc":"2.0","id":{{hello.GetProperty("id")}},"result":{{reply}}}""");
+        await using var connection = await connecting.WaitAsync(Timeout);
+
+        Assert.Equal(new LoginSession { Id = 3, User = 501, Gui = true }, connection.Hello.LoginSession);
     }
 
     [Fact]
