@@ -82,6 +82,11 @@ builder.Services.AddHerdr(o => o.Command = ["ssh", "box", "hc", "connect", "--se
 supervisor.RetryNow(startCore: true);   // runs the command once more
 ```
 
+`CommandEnvironment` sets variables for the command's process only (null removes one), such as
+`SSH_ASKPASS` and `SSH_ASKPASS_REQUIRE=force` so ssh asks for a password or a new host key through
+your app instead of a terminal it does not have. Its values are never logged. Give such a command a
+longer `Connection.HandshakeTimeout`: the handshake waits while the person answers.
+
 Where no program can be started (a phone), open the stream yourself, such as an SSH channel to
 `hc connect`, and pass it as a `Carrier`: an `IHerdrTransport` that opens a fresh stream on each
 attempt. It follows the same rules as `Command`, which it replaces.

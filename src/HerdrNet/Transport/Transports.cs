@@ -79,6 +79,7 @@ public sealed class HcConnectTransport : IHerdrTransport
     readonly string _executable;
     readonly IReadOnlyList<string> _arguments;
     readonly string? _session;
+    readonly IReadOnlyDictionary<string, string?>? _environment;
     readonly ILogger _logger;
 
     /// <summary>Runs <c><paramref name="hcPath"/> connect</c>, for <paramref name="session"/> when given.</summary>
@@ -94,10 +95,18 @@ public sealed class HcConnectTransport : IHerdrTransport
     /// and the description goes into logs and error messages.
     /// </summary>
     public HcConnectTransport(string executable, IReadOnlyList<string> arguments, string? session = null, ILogger? logger = null)
+        : this(executable, arguments, session, logger, environment: null) { }
+
+    /// <summary>
+    /// As above, with <paramref name="environment"/> set for the command's process only (a null value
+    /// removes a variable). The variables are never logged.
+    /// </summary>
+    public HcConnectTransport(string executable, IReadOnlyList<string> arguments, string? session, ILogger? logger, IReadOnlyDictionary<string, string?>? environment)
     {
         _executable = executable;
         _arguments = arguments;
         _session = session;
+        _environment = environment;
         _logger = logger ?? NullLogger.Instance;
         Description = $"{Path.GetFileName(executable)} (a command)";
     }
@@ -121,6 +130,13 @@ public sealed class HcConnectTransport : IHerdrTransport
             start.ArgumentList.Add(argument);
         if (_session is not null)
             start.Environment["HC_SESSION"] = HerdrEndpoint.SessionName(_session);
+        foreach (var (name, value) in _environment ?? new Dictionary<string, string?>())
+        {
+            if (value is null)
+                start.Environment.Remove(name);
+            else
+                start.Environment[name] = value;
+        }
 
         Process process;
         try

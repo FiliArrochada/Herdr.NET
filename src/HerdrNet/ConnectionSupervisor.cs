@@ -41,6 +41,13 @@ public sealed class HerdrOptions
     public IReadOnlyList<string>? Command { get; set; }
 
     /// <summary>
+    /// Environment variables for <see cref="Command"/>'s process only, on top of this process's own; a
+    /// null value removes one. For what a command reads from its environment, such as <c>SSH_ASKPASS</c>
+    /// so ssh asks its questions through the caller. Never logged: values can be secrets.
+    /// </summary>
+    public IReadOnlyDictionary<string, string?>? CommandEnvironment { get; set; }
+
+    /// <summary>
     /// A transport the caller opens itself, used instead of this machine's core: an SSH channel to
     /// <c>hc connect</c> on another machine, from an app that cannot start <c>ssh</c>. It opens a fresh
     /// stream on every attempt. Treated like <see cref="Command"/>: it may start a core, so after a loss
@@ -375,7 +382,7 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
     {
         _ when _options.Carrier is { } carrier => carrier,
         _ when _options.Command is { Count: > 0 } command =>
-            new HcConnectTransport(command[0], command.Skip(1).ToArray(), session: null, _loggers.CreateLogger<HcConnectTransport>()),
+            new HcConnectTransport(command[0], command.Skip(1).ToArray(), session: null, _loggers.CreateLogger<HcConnectTransport>(), _options.CommandEnvironment),
         HerdrTransportPreference.Direct => new EndpointTransport(HerdrEndpoint.Resolve(_options.Session)),
         _ => HcLocator.Find(_options.HcPath) is { } hc
             ? new HcConnectTransport(hc, _options.Session, _loggers.CreateLogger<HcConnectTransport>())
