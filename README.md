@@ -18,11 +18,11 @@ Not affiliated with the herdr project. "herdr" names the software this library t
 
 | | |
 |---|---|
-| API version | herdr-core **0.1.20**, protocol generation 1 ([`api/herdr-core-0.1.20.openrpc.json`](api/herdr-core-0.1.20.openrpc.json)) |
-| Package version | `0.1.20` = the API version; a 4th component is a client-only revision against the same API |
+| API version | herdr-core **0.1.21**, protocol generation 1 ([`api/herdr-core-0.1.21.openrpc.json`](api/herdr-core-0.1.21.openrpc.json)) |
+| Package version | `0.1.21` = the API version; a 4th component is a client-only revision against the same API |
 | Framework | `net10.0` |
 | Dependencies | `Microsoft.Extensions.Logging.Abstractions`, `.DependencyInjection.Abstractions`, `.Hosting.Abstractions`, `.Options` |
-| Status | preview: unit-tested against a scripted core; probe passes against hc 0.1.20 on Windows and Debian 13 (both transports) |
+| Status | preview: unit-tested against a scripted core; probe passes against hc 0.1.21 on Windows and hc 0.1.20 on Debian 13 (both transports) |
 
 The models are written by hand and kept in sync with the vendored OpenRPC document; contract tests
 fail when a wire name the client uses is not in the schema, or a field the schema requires is not

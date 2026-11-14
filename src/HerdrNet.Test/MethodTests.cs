@@ -87,8 +87,9 @@ public class MethodTests
         var machines = connection.Machines.ListAsync();
         request = await core.ReadRequestAsync();
         await core.ReplyAsync(request.GetProperty("id").GetInt64(),
-            """{"machines":[{"name":"rohan","target":"me@rohan","id":"m1","host":"rohan","version":"0.1.18","state":"connected","temporary":false,"via":false}]}""");
-        Assert.Equal(("rohan", "connected"), Assert.Single((await machines.WaitAsync(Timeout)).Machines) is var m ? (m.Name, m.State) : default);
+            """{"machines":[{"name":"rohan","target":"me@rohan","id":"m1","host":"rohan","version":"0.1.18","state":"connected","temporary":false,"via":false,"keeps_running_after_logout":false,"logout_linger_user":"me"}]}""");
+        var m = Assert.Single((await machines.WaitAsync(Timeout)).Machines);
+        Assert.Equal(("rohan", "connected", false, "me"), (m.Name, m.State, m.KeepsRunningAfterLogout, m.LogoutLingerUser));
 
         var dial = connection.Machines.ConnectAsync("rohan");
         request = await core.ReadRequestAsync();

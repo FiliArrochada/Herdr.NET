@@ -3,7 +3,7 @@ run-name: Release ${{ github.ref_name }} to NuGet
 
 # Publishes the HerdrNet package to nuget.org when a v<version> tag is pushed:
 #
-#   git tag v0.1.20 && git push origin v0.1.20
+#   git tag v0.1.21 && git push origin v0.1.21
 #
 # The tag must match <Version> in src/HerdrNet/HerdrNet.csproj (bump it there first, commit,
 # then tag that commit); the "Check version" step fails the run otherwise.

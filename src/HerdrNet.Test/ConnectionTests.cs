@@ -27,6 +27,21 @@ public class ConnectionTests
         Assert.Equal("c0ffee", connection.Hello.Core.Id);
         Assert.True(connection.Supports("automatic_input"));
         Assert.Null(connection.Hello.LoginSession);
+        Assert.Null(connection.Hello.KeepsRunningAfterLogout);   // cores before 0.1.21 leave it out
+    }
+
+    [Fact]
+    public async Task Hello_keeps_whether_programs_survive_logout()
+    {
+        await using var core = new FakeCore();
+        var connecting = HerdrConnection.ConnectAsync(core.Transport);
+        var hello = await core.ReadLineAsync();
+        var reply = FakeCore.DefaultHello.Replace("\"framed\":true", "\"framed\":true,\"keeps_running_after_logout\":false,\"logout_linger_user\":\"me\"");
+
+        await core.SendLineAsync($$"""{"jsonrpc":"2.0","id":{{hello.GetProperty("id")}},"result":{{reply}}}""");
+        await using var connection = await connecting.WaitAsync(Timeout);
+
+        Assert.Equal((false, "me"), (connection.Hello.KeepsRunningAfterLogout, connection.Hello.LogoutLingerUser));
     }
 
     [Fact]

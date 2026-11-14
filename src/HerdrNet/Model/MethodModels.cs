@@ -129,6 +129,13 @@ public sealed record MachineView
     public bool Via { get; init; }
     /// <summary>Why it is not connected.</summary>
     public string? Why { get; init; }
+    /// <summary>
+    /// Last observed: true when its programs keep running after the remote user's last logout (systemd
+    /// lingering), false when they stop; null for cores before 0.1.21, or where it does not apply.
+    /// </summary>
+    public bool? KeepsRunningAfterLogout { get; init; }
+    /// <summary>The remote account for <c>loginctl enable-linger</c>, when that applies.</summary>
+    public string? LogoutLingerUser { get; init; }
 }
 
 /// <summary>Options of <c>terminal.send</c> besides the terminal and text.</summary>

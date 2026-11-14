@@ -11,7 +11,7 @@ namespace HerdrNet.Test;
 /// </summary>
 public class SchemaContractTests
 {
-    const string SchemaFile = "herdr-core-0.1.20.openrpc.json";
+    const string SchemaFile = "herdr-core-0.1.21.openrpc.json";
 
     static readonly Lazy<JsonElement> Schema = new(() =>
         JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "api", SchemaFile))).RootElement.Clone());

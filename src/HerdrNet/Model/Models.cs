@@ -24,6 +24,13 @@ public sealed record HelloResult
     public IReadOnlyList<string> Features { get; init; } = [];
     /// <summary>The OS login the core inherited; null when the core does not say.</summary>
     public LoginSession? LoginSession { get; init; }
+    /// <summary>
+    /// True when systemd lingering is on, false when the core's programs stop at the user's last logout;
+    /// null when unsupported, not applicable or unknown (and from cores before 0.1.21).
+    /// </summary>
+    public bool? KeepsRunningAfterLogout { get; init; }
+    /// <summary>The account an administrator passes to <c>loginctl enable-linger</c>, when that applies.</summary>
+    public string? LogoutLingerUser { get; init; }
 }
 
 /// <summary>The OS login a process inherited (rather than text restored from its environment).</summary>
@@ -223,6 +230,13 @@ public sealed record ServerStatus
     public int Finished { get; init; }
     /// <summary>The package manager this hc came from, if any.</summary>
     public string? InstalledBy { get; init; }
+    /// <summary>
+    /// True when systemd lingering is on, false when the core's programs stop at the user's last logout;
+    /// null when unsupported, not applicable or unknown (and from cores before 0.1.21). Checked on every call.
+    /// </summary>
+    public bool? KeepsRunningAfterLogout { get; init; }
+    /// <summary>The account an administrator passes to <c>loginctl enable-linger</c>, when that applies.</summary>
+    public string? LogoutLingerUser { get; init; }
     /// <summary>Every holder process (not modelled yet).</summary>
     public IReadOnlyList<JsonElement> Holders { get; init; } = [];
 }
