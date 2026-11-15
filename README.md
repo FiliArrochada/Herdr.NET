@@ -74,6 +74,12 @@ The supervisor connects to the core's endpoint and, when nothing listens there, 
 after a loss it retries at 0.5, 1, 2, then every 5 s. Streams do not survive a reconnect: attach
 again (with `Resumed = true`) when the state turns `Connected`.
 
+A dropped network ends nothing by itself: the transport stays open and silent, and over ssh it can
+stay that way for many minutes while every call waits. While its mirror's subscription is open (it gets
+the core's heartbeat every 15 s), the supervisor counts the connection as lost once the core has sent
+nothing for `SilenceLimit` (default 45 s; null turns it off): calls and streams fail, and the state
+moves on as after any loss.
+
 A core on another machine, through any command that carries the protocol on its stdio:
 
 ```csharp

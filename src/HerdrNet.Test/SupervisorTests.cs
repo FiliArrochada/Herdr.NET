@@ -398,6 +398,67 @@ public class SupervisorTests
         await core.DisposeAsync();
     }
 
+    static async Task ConnectWithMirrorAsync(Harness h, FakeCore core)
+    {
+        h.Supervisor.Start();
+        await AnswerHelloAsync(core);
+        var subscribe = await core.ReadRequestAsync();
+        await core.ReplyAsync(subscribe.GetProperty("id").GetInt64(), """{"seq":1,"terminals":[],"channel":3}""");
+        await h.WaitForAsync(HerdrConnectionState.Connected);
+    }
+
+    [Fact]
+    public async Task A_core_that_says_nothing_past_the_silence_limit_counts_as_lost()
+    {
+        // A dropped network ends nothing by itself: the transport stays open and silent.
+        await using var h = new Harness(mirror: true, o => o.SilenceLimit = TimeSpan.FromMilliseconds(300));
+        var core = h.Queue();
+        await ConnectWithMirrorAsync(h, core);
+        var connection = h.Supervisor.Current!;
+        var pending = connection.Machines.ListAsync(); // a call made into the dead line
+
+        var lost = await h.WaitForAsync(HerdrConnectionState.Reconnecting);
+
+        Assert.False(connection.IsConnected);
+        Assert.Contains("sent nothing", Assert.IsType<HerdrConnectionException>(lost.Error).Message);
+        await Assert.ThrowsAsync<HerdrConnectionException>(() => pending.WaitAsync(Timeout));
+        await core.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Heartbeats_keep_a_quiet_connection()
+    {
+        await using var h = new Harness(mirror: true, o => o.SilenceLimit = TimeSpan.FromMilliseconds(300));
+        var core = h.Queue();
+        await ConnectWithMirrorAsync(h, core);
+
+        for (var seq = 2; seq < 12; seq++)
+        {
+            await core.SendDataAsync(3, $$$"""{"jsonrpc":"2.0","method":"heartbeat","params":{"seq":{{{seq}}}}}""" + "\n");
+            await Task.Delay(100);
+        }
+
+        Assert.Equal(HerdrConnectionState.Connected, h.Supervisor.State);
+        Assert.True(h.Supervisor.Current!.IsConnected);
+        await core.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Without_a_subscription_silence_is_not_watched()
+    {
+        // No subscription, no heartbeat: an idle connection is quiet by right.
+        await using var h = new Harness(mirror: false, o => o.SilenceLimit = TimeSpan.FromMilliseconds(100));
+        var core = h.Queue();
+        h.Supervisor.Start();
+        await AnswerHelloAsync(core);
+        await h.WaitForAsync(HerdrConnectionState.Connected);
+
+        await Task.Delay(600);
+
+        Assert.Equal(HerdrConnectionState.Connected, h.Supervisor.State);
+        await core.DisposeAsync();
+    }
+
     [Fact]
     public async Task Disposing_closes_the_connection_and_sends_nothing_else()
     {

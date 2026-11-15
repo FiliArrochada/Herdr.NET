@@ -75,6 +75,15 @@ public sealed class HerdrOptions
 
     /// <summary>Mirror only terminals carrying all these labels; null mirrors all (and document changes).</summary>
     public IReadOnlyDictionary<string, string>? MirrorLabels { get; set; }
+
+    /// <summary>
+    /// How long the core may say nothing at all before the connection counts as lost (default 45 s: three
+    /// of the 15 s heartbeats its event subscription sends; null: never). Only while
+    /// <see cref="MirrorTerminals"/> holds a subscription open. A dropped network or a stalled relay ends
+    /// nothing by itself: without this, <c>ssh</c> keeps a dead line open for minutes or hours while
+    /// every call waits and the state still says <see cref="HerdrConnectionState.Connected"/>.
+    /// </summary>
+    public TimeSpan? SilenceLimit { get; set; } = TimeSpan.FromSeconds(45);
 }
 
 /// <summary>Where a <see cref="ConnectionSupervisor"/> is.</summary>
@@ -404,6 +413,9 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
 
         var ended = mirror is null ? connection.Completion : Task.WhenAny(connection.Completion, mirror.Completion).Unwrap();
         Exception? error = null;
+        using var watching = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        if (mirror is not null && _options.SilenceLimit is { } limit && limit > TimeSpan.Zero)
+            _ = WatchSilenceAsync(connection, limit, watching.Token);
         try
         {
             await ended.WaitAsync(stop).ConfigureAwait(false);
@@ -424,6 +436,7 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
         }
         finally
         {
+            watching.Cancel();
             lock (_gate)
             {
                 Current = null;
@@ -438,6 +451,34 @@ public sealed class ConnectionSupervisor : IAsyncDisposable
         }
 
         return error;
+    }
+
+    /// <summary>
+    /// Abandons <paramref name="connection"/> once the core has said nothing for <paramref name="limit"/>.
+    /// The subscription's heartbeat arrives every 15 s, so that silence is a dead line, not a quiet core.
+    /// </summary>
+    async Task WatchSilenceAsync(HerdrConnection connection, TimeSpan limit, CancellationToken cancellationToken)
+    {
+        var every = TimeSpan.FromTicks(Math.Clamp(limit.Ticks / 5, TimeSpan.TicksPerMillisecond * 10, TimeSpan.TicksPerSecond * 5));
+        try
+        {
+            using var timer = new PeriodicTimer(every);
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!connection.IsConnected)
+                    return;
+                var silent = connection.SinceLastReceived;
+                if (silent < limit)
+                    continue;
+                _logger.LogWarning("No word from {Endpoint} for {Seconds:0} s: the line counts as lost", connection.Description, silent.TotalSeconds);
+                connection.Abandon(new HerdrConnectionException(
+                    $"{connection.Description} sent nothing for {silent.TotalSeconds:0} s (the core's heartbeat comes every 15 s): the line was lost."));
+                return;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     TimeSpan Delay(int failures)

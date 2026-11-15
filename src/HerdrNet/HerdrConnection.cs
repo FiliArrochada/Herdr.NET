@@ -45,6 +45,7 @@ public sealed class HerdrConnection : IAsyncDisposable
     readonly CancellationTokenSource _shutdown = new();
     readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     long _nextId;
+    long _lastReceived = Environment.TickCount64;
     int _ended;
     int _disposed;
     Task _readLoop = Task.CompletedTask;
@@ -74,6 +75,20 @@ public sealed class HerdrConnection : IAsyncDisposable
 
     /// <summary>False once the connection has ended.</summary>
     public bool IsConnected => Volatile.Read(ref _ended) == 0;
+
+    /// <summary>
+    /// How long since the core last sent anything (a reply, a stream frame, an event or a heartbeat). An
+    /// event subscription gets a heartbeat every 15 s, so with one open a long silence means the line is
+    /// gone even when the transport has not noticed (a dropped network says nothing).
+    /// </summary>
+    public TimeSpan SinceLastReceived => TimeSpan.FromMilliseconds(Environment.TickCount64 - Volatile.Read(ref _lastReceived));
+
+    /// <summary>
+    /// Ends the connection as lost because of <paramref name="reason"/>: pending calls and streams fail with
+    /// it and <see cref="Completion"/> faults, as when the transport breaks. For a watcher that knows the
+    /// line is dead before the transport does. Dispose it afterwards; the core is untouched.
+    /// </summary>
+    internal void Abandon(HerdrConnectionException reason) => End(reason);
 
     /// <summary>Terminal methods and attach streams.</summary>
     public TerminalsClient Terminals { get; }
@@ -348,6 +363,8 @@ public sealed class HerdrConnection : IAsyncDisposable
             {
                 var read = await _input.ReadAsync(_shutdown.Token).ConfigureAwait(false);
                 var buffer = read.Buffer;
+                if (!buffer.IsEmpty)
+                    Volatile.Write(ref _lastReceived, Environment.TickCount64);
                 while (FrameCodec.TryReadFrame(ref buffer, out var header, out var payload))
                     await DispatchAsync(header, payload).ConfigureAwait(false);
                 _input.AdvanceTo(buffer.Start, buffer.End);
