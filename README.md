@@ -119,7 +119,8 @@ from screen text. Status is whatever the program reported through OSC 7501 (`Ter
 ## Probe
 
 `samples/HerdrNet.Probe` runs the protocol end to end against a real core and prints a table of
-what it measured: connect, handshake, list, subscribe, run a shell, attach, type, resize, detach,
+what it measured: connect, handshake, the core's `rpc.discover` document against the vendored one in
+`api/` (methods, params, results, schema properties, required fields and enums), list, subscribe, run a shell, attach, type, resize, detach,
 reattach, then the same terminal again from a brand-new connection (the client-restart case),
 reattach latency over 20 runs, the mirror against `terminal.get`, `templates.list`, `machine.list`,
 `terminal.send`, an observer's `resize_notifications`, the supervisor, and with `--flood` the
@@ -130,7 +131,12 @@ touches your terminals, and kills (then removes) only the terminals it started.
 HC_SESSION=herdrnet-probe hc ls        # starts that session's core
 dotnet run --project samples/HerdrNet.Probe -- --session herdrnet-probe --flood
 dotnet run --project samples/HerdrNet.Probe -- --session herdrnet-probe --hc auto   # via hc connect
+dotnet run --project samples/HerdrNet.Probe -- --discover                           # schema drift only; exit 1 on any
+dotnet run --project samples/HerdrNet.Probe -- --discover --save-schema api/herdr-core-<version>.openrpc.json
 ```
+
+On a new core release, `--discover` lists what changed against the newest vendored document, and
+`--save-schema` vendors the core's own (it never overwrites a file).
 
 ## Build and test
 

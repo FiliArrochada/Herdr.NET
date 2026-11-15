@@ -1,15 +1,20 @@
 // Protocol probe: exercises a real herdr-core end to end and prints what it measured.
 //
 //   dotnet run --project samples/HerdrNet.Probe -- [--session NAME] [--hc PATH] [--flood] [--keep] [--verbose]
+//                                                   [--discover] [--against FILE] [--save-schema FILE]
 //
 // It talks to the core of session NAME (default: herdrnet-probe, a separate core from your own),
 // starts its own terminals labelled herdr-net.probe=1, and kills only those at the end (unless --keep).
-// It never stops or restarts a core.
+// It never stops or restarts a core. Every run compares the core's rpc.discover document with the
+// vendored one in api/ (or FILE with --against); --discover does only that (no terminals) and exits
+// 1 on any difference;
+// --save-schema writes the live document to FILE (never over an existing one), to vendor a release.
 
 using System.Buffers;
 using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Text;
+using System.Text.Json;
 using HerdrNet;
 using HerdrNet.Model;
 using HerdrNet.Transport;
@@ -19,6 +24,7 @@ var session = Arg("--session") ?? "herdrnet-probe";
 var hcArg = Arg("--hc");
 var flood = args.Contains("--flood");
 var keep = args.Contains("--keep");
+var discoverOnly = args.Contains("--discover");
 using var loggerFactory = LoggerFactory.Create(b => b
     .AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss.fff "; })
     .SetMinimumLevel(args.Contains("--verbose") ? LogLevel.Debug : LogLevel.Warning));
@@ -65,6 +71,35 @@ await using (connection)
     Step("features", string.Join(", ", connection.Hello.Features));
     var missing = HerdrMethods.All.Where(m => !connection.Hello.Methods.Contains(m)).ToArray();
     Step("modelled methods missing from core", missing.Length == 0 ? "none" : string.Join(", ", missing));
+
+    // Schema drift (U7): the live rpc.discover document against the vendored one in api/.
+    var discovered = await Timed("rpc.discover", () => connection.RawCallAsync("rpc.discover"));
+    var drift = -1;
+    if ((Arg("--against") is { } against ? (Path.GetFullPath(against), true) : SchemaDrift.FindVendored(connection.Hello.Version)) is { } vendored)
+    {
+        using var vendoredDoc = JsonDocument.Parse(await File.ReadAllTextAsync(vendored.Path));
+        var diffs = SchemaDrift.Compare(vendoredDoc.RootElement, discovered);
+        drift = diffs.Count;
+        var name = Path.GetFileName(vendored.Path) + (vendored.SameVersion ? "" : $" (core {connection.Hello.Version} not vendored)");
+        Step("schema vs " + name, diffs.Count == 0 ? "identical methods, params, results and schemas" : $"{diffs.Count} difference(s)");
+        foreach (var d in diffs)
+            Step("  drift", d);
+    }
+    else
+    {
+        Step("schema drift", "api/ not found beside the probe; skipped");
+    }
+
+    if (Arg("--save-schema") is { } savePath)
+    {
+        if (File.Exists(savePath))
+            Fail($"{savePath} exists; vendored documents are never overwritten.");
+        await File.WriteAllTextAsync(savePath, JsonSerializer.Serialize(discovered, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+        Step("schema saved", savePath);
+    }
+
+    if (discoverOnly)
+        return drift == 0 ? 0 : 1;
 
     var status = await Timed("server.status", () => connection.Server.StatusAsync());
     Step("status", $"pid={status.Pid} live={status.Live} finished={status.Finished} installed_by={status.InstalledBy ?? "-"}");

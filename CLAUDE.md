@@ -24,8 +24,9 @@ One package, `net10.0`, UI-free, MIT. Layout:
 - **The protocol comes from herdr-core's documents, never from guesses.** Sources of truth: the
   vendored OpenRPC file and herdr-core's `schema/README.md` (framing, attach, events). Anything not
   in them is marked as unverified in code comments and README Notes until a real core confirms it.
-- **Hand-written models, checked by `SchemaContractTests`.** New API release: add its document to
-  `api/` (never overwrite), bump `SchemaFile`, fix the failures, bump `<Version>`.
+- **Hand-written models, checked by `SchemaContractTests`.** New API release: the probe's `--discover`
+  against its core lists the drift, `--save-schema api/herdr-core-<v>.openrpc.json` adds its
+  document to `api/` (never overwrite), then bump `SchemaFile`, fix the failures, bump `<Version>`.
 - **Open word sets stay strings** (`state`, `reason`, status words, error kinds, event types) with
   constants alongside: the core adds values without a new generation.
 - **The reader loop never waits on a consumer.** Stream bytes go into a pipe with no pause
