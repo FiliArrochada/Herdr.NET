@@ -27,6 +27,8 @@ One package, `net10.0`, UI-free, MIT. Layout:
 - **Hand-written models, checked by `SchemaContractTests`.** New API release: the probe's `--discover`
   against its core lists the drift, `--save-schema api/herdr-core-<v>.openrpc.json` adds its
   document to `api/` (never overwrite), then bump `SchemaFile`, fix the failures, bump `<Version>`.
+  `upstream-check.yml` compares herdr-core's release tags with `api/` daily and keeps an
+  `upstream-release` issue open (assigned to the owner) until `api/` has caught up.
 - **Open word sets stay strings** (`state`, `reason`, status words, error kinds, event types) with
   constants alongside: the core adds values without a new generation.
 - **The reader loop never waits on a consumer.** Stream bytes go into a pipe with no pause

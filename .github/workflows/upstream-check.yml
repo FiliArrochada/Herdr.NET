@@ -1,0 +1,99 @@
+name: Upstream release check
+
+# Daily check for herdr-core releases newer than the newest OpenRPC document vendored in api/
+# (api/herdr-core-<version>.openrpc.json). When upstream has tagged a newer version it opens (or
+# comments on) an issue labeled 'upstream-release'; once api/ has caught up it closes the issue.
+#
+# A failed lookup (network, rate limit, no tags) fails this job and leaves the issue alone.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare upstream tags with api/
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          local_v=$(ls api/herdr-core-*.openrpc.json \
+            | sed -E 's#.*/herdr-core-(.+)\.openrpc\.json#\1#' | sort -V | tail -n1)
+          # Release tags only (vX.Y.Z), no pre-releases.
+          upstream=$(gh api 'repos/herdrdev/herdr-core/tags?per_page=100' --paginate --jq '.[].name' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V)
+          if [ -z "$upstream" ]; then echo "No release tags found upstream"; exit 2; fi
+          latest=$(printf '%s\n' "$upstream" | tail -n1)
+          newer=$(printf '%s\n' "$upstream" | awk -v cur="$local_v" '
+            { split($0, a, "."); split(cur, b, ".")
+              for (i = 1; i <= 3; i++) { if (a[i] + 0 > b[i] + 0) { print; next } if (a[i] + 0 < b[i] + 0) next } }')
+          echo "Vendored in api/: $local_v"
+          echo "Latest upstream:  $latest"
+          echo "local=$local_v" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          if [ -n "$newer" ]; then
+            echo "Newer releases:"; printf '  v%s\n' $newer
+            printf '%s\n' $newer > newer.txt
+            echo "drift=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open, update, or close upstream-release issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label upstream-release --state open \
+            --json number --jq '.[0].number // empty' || true)
+
+          if [ "${{ steps.check.outputs.drift }}" = "1" ]; then
+            {
+              echo "herdr-core has released versions newer than the newest document in \`api/\` (${{ steps.check.outputs.local }}), checked $(date -u +%F):"
+              echo
+              while read -r v; do
+                echo "- [v$v](https://github.com/herdrdev/herdr-core/releases/tag/v$v)"
+              done < newer.txt
+              echo
+              echo "To update the client, oldest first:"
+              echo "1. Install that hc and run \`dotnet run --project samples/HerdrNet.Probe -- --discover\` to list the drift"
+              echo "2. \`--discover --save-schema api/herdr-core-<version>.openrpc.json\` to vendor its document (keep the old files: api/ is the version history)"
+              echo "3. Bump \`SchemaFile\` in the contract tests, fix the failures, bump \`<Version>\` in HerdrNet.csproj and the README"
+            } > issue-body.md
+
+            if [ -n "$existing" ]; then
+              # The check runs daily: comment only when a release appears that the issue does not name yet.
+              seen=$(gh issue view "$existing" --repo "$GITHUB_REPOSITORY" --json title,body,comments \
+                --jq '[.title, .body, .comments[].body] | join("\n")')
+              if printf '%s' "$seen" | grep -qF "v${{ steps.check.outputs.latest }}]"; then
+                echo "Issue #$existing already names v${{ steps.check.outputs.latest }}"
+                exit 0
+              fi
+              # Assigning is what notifies the owner: an issue opened by github-actions[bot] reaches nobody
+              # who is not watching the repo for issues.
+              gh issue edit "$existing" --repo "$GITHUB_REPOSITORY" --add-assignee "$GITHUB_REPOSITORY_OWNER" \
+                --title "herdr-core v${{ steps.check.outputs.latest }} released" || true
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file issue-body.md
+            else
+              gh label create upstream-release --repo "$GITHUB_REPOSITORY" \
+                --description "New herdr-core release to support" \
+                --color D93F0B 2>/dev/null || true
+              gh issue create --repo "$GITHUB_REPOSITORY" \
+                --title "herdr-core v${{ steps.check.outputs.latest }} released" \
+                --label upstream-release --body-file issue-body.md \
+                --assignee "$GITHUB_REPOSITORY_OWNER"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+              --comment "api/ has the latest herdr-core release (v${{ steps.check.outputs.latest }}), closing."
+          fi
