@@ -1,5 +1,8 @@
 # HerdrNet
 
+[![CI](https://github.com/FiliArrochada/Herdr.NET/actions/workflows/ci.yml/badge.svg)](https://github.com/FiliArrochada/Herdr.NET/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/HerdrNet.svg)](https://www.nuget.org/packages/HerdrNet/)
+
 A hand-maintained, strongly typed, asynchronous .NET client for
 [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`), the terminal runtime that keeps
 programs and coding agents alive after their viewers leave. It speaks the core's own protocol, with
