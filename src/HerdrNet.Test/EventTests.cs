@@ -9,6 +9,22 @@ public class EventTests
     static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
+    public async Task A_subscription_can_name_the_documents_it_hears()
+    {
+        var (connection, core) = await FakeCore.ConnectedAsync();
+        await using var _ = connection;
+        await using var __ = core;
+
+        var subscribing = connection.Events.SubscribeAsync(docs: ["peguwire", "peguwire.dev.*"]);
+        var request = await core.ReadRequestAsync();
+        Assert.Equal(["peguwire", "peguwire.dev.*"], request.GetProperty("params").GetProperty("docs").EnumerateArray().Select(d => d.GetString()));
+        await core.ReplyAsync(request.GetProperty("id").GetInt64(), """{"seq":5,"terminals":[],"channel":3}""");
+        await using var subscription = await subscribing.WaitAsync(Timeout);
+
+        Assert.Empty(subscription.Terminals);                       // documents alone: an empty snapshot
+    }
+
+    [Fact]
     public async Task Subscribe_returns_the_snapshot_then_events_heartbeats_and_missed_in_order()
     {
         var (connection, core) = await FakeCore.ConnectedAsync();
@@ -18,6 +34,7 @@ public class EventTests
         var subscribing = connection.Events.SubscribeAsync(labels: new Dictionary<string, string> { ["app.workspace"] = "w1" });
         var request = await core.ReadRequestAsync();
         Assert.Equal("w1", request.GetProperty("params").GetProperty("labels").GetProperty("app.workspace").GetString());
+        Assert.False(request.GetProperty("params").TryGetProperty("docs", out var ___));   // not given: a core before 0.1.22 never sees it
         await core.ReplyAsync(request.GetProperty("id").GetInt64(), $$"""{"seq":41,"terminals":[{{ConnectionTests.Terminal("t7")}}],"channel":3}""");
         await using var subscription = await subscribing.WaitAsync(Timeout);
 

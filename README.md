@@ -21,8 +21,8 @@ Not affiliated with the herdr project. "herdr" names the software this library t
 
 | | |
 |---|---|
-| API version | herdr-core **0.1.21**, protocol generation 1 ([`api/herdr-core-0.1.21.openrpc.json`](api/herdr-core-0.1.21.openrpc.json)) |
-| Package version | `0.1.21` = the API version; a 4th component is a client-only revision against the same API |
+| API version | herdr-core **0.1.22**, protocol generation 1 ([`api/herdr-core-0.1.22.openrpc.json`](api/herdr-core-0.1.22.openrpc.json)) |
+| Package version | `0.1.22` = the API version; a 4th component is a client-only revision against the same API |
 | Framework | `net10.0` |
 | Dependencies | `Microsoft.Extensions.Logging.Abstractions`, `.DependencyInjection.Abstractions`, `.Hosting.Abstractions`, `.Options` |
 | Status | preview: unit-tested against a scripted core; probe passes against hc 0.1.21 on Windows and hc 0.1.20 on Debian 13 (both transports) |
@@ -30,6 +30,7 @@ Not affiliated with the herdr project. "herdr" names the software this library t
 The models are written by hand and kept in sync with the vendored OpenRPC document; contract tests
 fail when a wire name the client uses is not in the schema, or a field the schema requires is not
 modelled. Methods not modelled yet are reachable through `RawCallAsync`.
+The `terminal.put_*` upload methods (0.1.22) pass files between cores and are not modelled.
 
 ## Usage
 
@@ -53,6 +54,10 @@ await using var events = await core.Events.SubscribeAsync();
 await foreach (var n in events.ReadAllAsync(ct))
     if (n is HerdrEvent { Type: HerdrEventTypes.Status } e) Console.WriteLine($"{e.Terminal}: {e.Data}");
 ```
+
+`SubscribeAsync(docs: ["app", "app.dev.*"])` hears those documents' `doc` events (0.1.22+; `*` ends a
+prefix). Naming documents narrows: alone they give an empty terminal snapshot; add a terminal filter
+to hear both.
 
 A live list, kept up to date (what a dashboard binds to):
 

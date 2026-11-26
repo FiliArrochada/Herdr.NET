@@ -17,7 +17,7 @@ internal sealed record SendParams(string Terminal, string Text, bool? Force, str
 internal sealed record KeysParams(string Terminal, IReadOnlyList<string> Keys);
 internal sealed record InterruptParams(string Terminal, double? Timeout);
 internal sealed record WaitParams(string? Terminal, string? Children, string? Output, double? Timeout, string? Caller);
-internal sealed record SubscribeParams(string? Terminal, string? ChildrenOf, IReadOnlyDictionary<string, string>? Labels);
+internal sealed record SubscribeParams(string? Terminal, string? ChildrenOf, IReadOnlyDictionary<string, string>? Labels, IReadOnlyList<string>? Docs);
 internal sealed record MachineParams(string Machine);
 internal sealed record ExecParams(IReadOnlyList<string>? Argv, string? Line, string? Cwd, IReadOnlyDictionary<string, string>? Env, byte[]? Input, string? On, double? Timeout);
 internal sealed record FileReadParams(string Path, string? Cwd, int? Offset, int? Limit, string? On);
