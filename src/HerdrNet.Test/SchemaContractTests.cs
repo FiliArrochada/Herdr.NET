@@ -44,6 +44,10 @@ public class SchemaContractTests
         { "TemplateInfo", "TemplateInfo" },
         { "MachineListResult", nameof(Json.MachineListResult) },
         { "MachineView", "MachineView" },
+        { "ExecResult", nameof(Json.ExecResult) },
+        { "FileReadResult", nameof(Json.FileReadResult) },
+        { "FileResult", nameof(Json.FileResult) },
+        { "Edit", nameof(Json.FileEdit) },
     };
 
     [Theory]
@@ -81,6 +85,11 @@ public class SchemaContractTests
         { "terminal.wait", nameof(Json.WaitParams) },
         { "templates.list", nameof(Json.EmptyParams) },
         { "machine.list", nameof(Json.EmptyParams) },
+        { "machine.connect", nameof(Json.MachineParams) },
+        { "machine.exec", nameof(Json.ExecParams) },
+        { "file.read", nameof(Json.FileReadParams) },
+        { "file.write", nameof(Json.FileWriteParams) },
+        { "file.edit", nameof(Json.FileEditParams) },
     };
 
     [Theory]

@@ -19,6 +19,10 @@ internal sealed record InterruptParams(string Terminal, double? Timeout);
 internal sealed record WaitParams(string? Terminal, string? Children, string? Output, double? Timeout, string? Caller);
 internal sealed record SubscribeParams(string? Terminal, string? ChildrenOf, IReadOnlyDictionary<string, string>? Labels);
 internal sealed record MachineParams(string Machine);
+internal sealed record ExecParams(IReadOnlyList<string>? Argv, string? Line, string? Cwd, IReadOnlyDictionary<string, string>? Env, byte[]? Input, string? On, double? Timeout);
+internal sealed record FileReadParams(string Path, string? Cwd, int? Offset, int? Limit, string? On);
+internal sealed record FileWriteParams(string Path, byte[] Data, string? Cwd, string? On);
+internal sealed record FileEditParams(string Path, IReadOnlyList<FileEdit> Edits, string? Cwd, string? On);
 internal sealed record DocGetParams(string Name);
 internal sealed record DocSetParams(string Name, JsonElement Value, ulong Version);
 
@@ -48,6 +52,14 @@ internal sealed record CloseReason(string? Reason, int? ExitCode, int? Signal);
 [JsonSerializable(typeof(WaitParams))]
 [JsonSerializable(typeof(MachineParams))]
 [JsonSerializable(typeof(MachineView))]
+[JsonSerializable(typeof(ExecParams))]
+[JsonSerializable(typeof(ExecResult))]
+[JsonSerializable(typeof(FileReadParams))]
+[JsonSerializable(typeof(FileWriteParams))]
+[JsonSerializable(typeof(FileEditParams))]
+[JsonSerializable(typeof(FileReadResult))]
+[JsonSerializable(typeof(FileResult))]
+[JsonSerializable(typeof(FileEdit))]
 [JsonSerializable(typeof(DocGetParams))]
 [JsonSerializable(typeof(DocSetParams))]
 [JsonSerializable(typeof(TerminalRunOptions))]

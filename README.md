@@ -114,6 +114,20 @@ Machines the core added (`hc machine add`): `core.Machines.ListAsync()`, and
 `core.Machines.ConnectAsync("rohan")` to dial one again now. Their terminals are in the same list
 and event stream as `rohan/t7`.
 
+A program without a terminal, and text files, on the core's computer or a machine (`On`/`on:`):
+
+```csharp
+var run = await core.Machines.ExecAsync(new ExecOptions { Line = "git status --short", Cwd = repo, Timeout = TimeSpan.FromSeconds(30) });
+Console.WriteLine($"{run.Code}: {Encoding.UTF8.GetString(run.Stdout)}");   // a nonzero exit is a result, not an error
+
+await core.Files.WriteAsync("notes/today.md", "# Today\n"u8.ToArray(), cwd: home);   // makes missing folders
+await core.Files.EditAsync("notes/today.md", [new FileEdit("# Today", "# Tuesday")], cwd: home);
+var text = (await core.Files.ReadAsync("notes/today.md", cwd: home)).Text;
+```
+
+The core expands no `~`, and a relative path starts in the folder of whatever connected to it (on a
+machine, its home): give `cwd`, or an absolute path.
+
 Other transports:
 
 ```csharp

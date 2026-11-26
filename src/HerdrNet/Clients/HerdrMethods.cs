@@ -22,6 +22,10 @@ public static class HerdrMethods
     public const string TemplatesList = "templates.list";
     public const string MachineList = "machine.list";
     public const string MachineConnect = "machine.connect";
+    public const string MachineExec = "machine.exec";
+    public const string FileRead = "file.read";
+    public const string FileWrite = "file.write";
+    public const string FileEdit = "file.edit";
     public const string EventsSubscribe = "events.subscribe";
     public const string DocGet = "doc.get";
     public const string DocSet = "doc.set";
@@ -31,5 +35,5 @@ public static class HerdrMethods
     public static IReadOnlyList<string> All { get; } =
         [Hello, ServerStatus, TerminalRun, TerminalList, TerminalGet, TerminalKill, TerminalLabel, TerminalRead, TerminalAttach,
          TerminalRm, TerminalKeep, TerminalSend, TerminalKeys, TerminalInterrupt, TerminalWait, TemplatesList, MachineList,
-         MachineConnect, EventsSubscribe, DocGet, DocSet];
+         MachineConnect, MachineExec, FileRead, FileWrite, FileEdit, EventsSubscribe, DocGet, DocSet];
 }

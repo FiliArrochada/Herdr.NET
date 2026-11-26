@@ -62,6 +62,7 @@ public sealed class HerdrConnection : IAsyncDisposable
         Server = new ServerClient(this);
         Templates = new TemplatesClient(this);
         Machines = new MachinesClient(this);
+        Files = new FilesClient(this);
     }
 
     /// <summary>Where this connection goes.</summary>
@@ -105,8 +106,11 @@ public sealed class HerdrConnection : IAsyncDisposable
     /// <summary>Named agent roles.</summary>
     public TemplatesClient Templates { get; }
 
-    /// <summary>Other cores this core reaches.</summary>
+    /// <summary>Other cores this core reaches, and programs run without a terminal there or here.</summary>
     public MachinesClient Machines { get; }
+
+    /// <summary>Text files on the core's computer or on a machine it reaches.</summary>
+    public FilesClient Files { get; }
 
     /// <summary>Whether the core advertised <paramref name="feature"/> in its handshake.</summary>
     public bool Supports(string feature) => Hello.Features.Contains(feature);

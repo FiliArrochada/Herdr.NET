@@ -156,4 +156,57 @@ public class MethodTests
 
         Assert.Throws<InvalidOperationException>(() => Parse("""{"seq":8,"type":"title","terminal":"t7","data":{"title":"x"}}""").AsSize());
     }
+
+    [Fact]
+    public async Task Exec_sends_bytes_and_seconds_and_decodes_its_output()
+    {
+        var (connection, core) = await FakeCore.ConnectedAsync();
+        await using var _ = connection;
+        await using var __ = core;
+
+        var exec = connection.Machines.ExecAsync(new ExecOptions { Line = "sort", Input = "b\na\n"u8.ToArray(), Timeout = TimeSpan.FromSeconds(15), On = "rohan" });
+        var request = await core.ReadRequestAsync();
+        var p = request.GetProperty("params");
+        Assert.Equal("machine.exec", request.GetProperty("method").GetString());
+        Assert.Equal(("sort", "YgphCg==", 15.0, "rohan"),
+            (p.GetProperty("line").GetString(), p.GetProperty("input").GetString(), p.GetProperty("timeout").GetDouble(), p.GetProperty("on").GetString()));
+        Assert.False(p.TryGetProperty("argv", out var ___));     // only what was given
+
+        await core.ReplyAsync(request.GetProperty("id").GetInt64(),
+            """{"code":0,"signal":null,"stdout":"YQpiCg==","stderr":"","truncated":false,"timed_out":false,"ms":12}""");
+        var result = await exec.WaitAsync(Timeout);
+
+        Assert.Equal((0, "a\nb\n", 0, false, 12L), (result.Code, Encoding.UTF8.GetString(result.Stdout), result.Stderr.Length, result.TimedOut, result.Ms));
+    }
+
+    [Fact]
+    public async Task Files_read_write_and_edit_round_trip()
+    {
+        var (connection, core) = await FakeCore.ConnectedAsync();
+        await using var _ = connection;
+        await using var __ = core;
+
+        var read = connection.Files.ReadAsync("notes.md", offset: 2, limit: 1, cwd: "/home/me");
+        var request = await core.ReadRequestAsync();
+        var p = request.GetProperty("params");
+        Assert.Equal(("file.read", "notes.md", 2, 1, "/home/me"),
+            (request.GetProperty("method").GetString(), p.GetProperty("path").GetString(), p.GetProperty("offset").GetInt32(), p.GetProperty("limit").GetInt32(), p.GetProperty("cwd").GetString()));
+        Assert.False(p.TryGetProperty("on", out var ___));
+        await core.ReplyAsync(request.GetProperty("id").GetInt64(), """{"text":"two\n","first":2,"last":2,"lines":3}""");
+        Assert.Equal(("two\n", 2L, 3L), (await read.WaitAsync(Timeout)) is var r ? (r.Text, r.First, r.Lines) : default);
+
+        var write = connection.Files.WriteAsync("/home/me/a.txt", "hi\n"u8.ToArray());
+        request = await core.ReadRequestAsync();
+        Assert.Equal(("file.write", "aGkK"), (request.GetProperty("method").GetString(), request.GetProperty("params").GetProperty("data").GetString()));
+        await core.ReplyAsync(request.GetProperty("id").GetInt64(), """{"path":"/home/me/a.txt","bytes":3}""");
+        Assert.Equal(("/home/me/a.txt", 3L), (await write.WaitAsync(Timeout)) is var w ? (w.Path, w.Bytes) : default);
+
+        var edit = connection.Files.EditAsync("/home/me/a.txt", [new FileEdit("hi", "hello")], on: "rohan");
+        request = await core.ReadRequestAsync();
+        var e = request.GetProperty("params").GetProperty("edits")[0];
+        Assert.Equal(("file.edit", "hi", "hello", "rohan"),
+            (request.GetProperty("method").GetString(), e.GetProperty("old").GetString(), e.GetProperty("new").GetString(), request.GetProperty("params").GetProperty("on").GetString()));
+        await core.ReplyAsync(request.GetProperty("id").GetInt64(), """{"path":"/home/me/a.txt","bytes":6}""");
+        Assert.Equal(6L, (await edit.WaitAsync(Timeout)).Bytes);
+    }
 }

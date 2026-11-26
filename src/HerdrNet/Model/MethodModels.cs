@@ -167,3 +167,70 @@ public sealed record TerminalWaitOptions
     /// <summary>See <see cref="TerminalSendOptions.Caller"/>.</summary>
     public string? Caller { get; init; }
 }
+
+/// <summary>
+/// Parameters of <c>machine.exec</c>: one program run without a terminal, here or on a machine. Give
+/// <see cref="Argv"/> or <see cref="Line"/>. Everything it started ends with it, at its timeout, or when
+/// the connection goes away.
+/// </summary>
+public sealed record ExecOptions
+{
+    /// <summary>Program and arguments, run as given (no shell).</summary>
+    public IReadOnlyList<string>? Argv { get; init; }
+    /// <summary>A shell line instead of <see cref="Argv"/>, run by that machine's shell (<c>sh -c</c>; Windows <c>%COMSPEC% /d /s /c</c>).</summary>
+    public string? Line { get; init; }
+    /// <summary>Working directory (default: the core's; on another machine, its home).</summary>
+    public string? Cwd { get; init; }
+    /// <summary>Set on top of the core's environment.</summary>
+    public IReadOnlyDictionary<string, string>? Env { get; init; }
+    /// <summary>Bytes for its stdin, at most 8 MB (without: stdin is closed).</summary>
+    public byte[]? Input { get; init; }
+    /// <summary>Run it on another machine added to this core.</summary>
+    public string? On { get; init; }
+    /// <summary>When it and everything it started are ended (the core's default 60 s, at most 600 s).</summary>
+    public TimeSpan? Timeout { get; init; }
+}
+
+/// <summary><c>machine.exec</c> reply. A nonzero exit or a timeout is a result, not an error.</summary>
+public sealed record ExecResult
+{
+    /// <summary>Its exit code; null when a signal ended it.</summary>
+    public int? Code { get; init; }
+    /// <summary>The signal that ended it (Unix).</summary>
+    public int? Signal { get; init; }
+    /// <summary>What it wrote to stdout: the first 8 MB.</summary>
+    public byte[] Stdout { get; init; } = [];
+    /// <summary>What it wrote to stderr: the first 1 MB.</summary>
+    public byte[] Stderr { get; init; } = [];
+    /// <summary>It wrote more than was kept (it still ran to its end).</summary>
+    public bool Truncated { get; init; }
+    /// <summary>It ran out of time and was ended: the output is what came so far.</summary>
+    public bool TimedOut { get; init; }
+    /// <summary>How long it ran, in milliseconds.</summary>
+    public long Ms { get; init; }
+}
+
+/// <summary><c>file.read</c> reply: lines of a text file.</summary>
+public sealed record FileReadResult
+{
+    /// <summary>The lines as they are in the file, line ends kept.</summary>
+    public string Text { get; init; } = "";
+    /// <summary>The first line given, from 1 (<see cref="Last"/> below it: none).</summary>
+    public long First { get; init; }
+    /// <summary>The last line given.</summary>
+    public long Last { get; init; }
+    /// <summary>Lines in the file.</summary>
+    public long Lines { get; init; }
+}
+
+/// <summary><c>file.write</c> and <c>file.edit</c> reply.</summary>
+public sealed record FileResult
+{
+    /// <summary>The file written, absolute.</summary>
+    public string Path { get; init; } = "";
+    /// <summary>Its size now.</summary>
+    public long Bytes { get; init; }
+}
+
+/// <summary>One replacement for <c>file.edit</c>: <paramref name="Old"/> must be found exactly once in the file as it was.</summary>
+public sealed record FileEdit(string Old, string New);

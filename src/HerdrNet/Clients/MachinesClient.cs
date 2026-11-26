@@ -20,4 +20,13 @@ public sealed class MachinesClient
     /// </summary>
     public Task<MachineView> ConnectAsync(string machine, CancellationToken cancellationToken = default) =>
         _connection.CallAsync(HerdrMethods.MachineConnect, new MachineParams(machine), HerdrJsonContext.Default.MachineParams, HerdrJsonContext.Default.MachineView, cancellationToken);
+
+    /// <summary>
+    /// Runs one program without a terminal, on the core's computer or on <see cref="ExecOptions.On"/>, and
+    /// returns its exit code and exactly what it wrote. A nonzero exit or a timeout is a result, not an error.
+    /// </summary>
+    public Task<ExecResult> ExecAsync(ExecOptions options, CancellationToken cancellationToken = default) =>
+        _connection.CallAsync(HerdrMethods.MachineExec,
+            new ExecParams(options.Argv, options.Line, options.Cwd, options.Env, options.Input, options.On, options.Timeout?.TotalSeconds),
+            HerdrJsonContext.Default.ExecParams, HerdrJsonContext.Default.ExecResult, cancellationToken);
 }
